@@ -6,6 +6,7 @@ dev/
 
 # Secrets
 .secrets
+.secrets.json
 
 # Python
 __pycache__/
