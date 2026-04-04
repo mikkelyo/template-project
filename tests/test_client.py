@@ -1,6 +1,6 @@
 """Tests for infrastructure/client."""
 
-from template_project.infrastructure.client import APIClient
+from template_project.infrastructure.api_client import APIClient
 
 
 def test_client_init(api_client):

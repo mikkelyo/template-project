@@ -1,0 +1,11 @@
+{
+  "app": {
+    "api_url": "https://api.example.com",
+    "api_timeout": 30
+  },
+  "llm": {
+    "model": "claude-sonnet-4-6",
+    "max_tokens": 4096,
+    "temperature": 0.7
+  }
+}

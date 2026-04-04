@@ -2,7 +2,7 @@
 
 import requests
 
-from template_project.core.config import AppConfig
+from template_project.core.configs.app_config import AppConfig
 
 
 class APIClient:

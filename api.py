@@ -2,13 +2,15 @@
 
 from fastapi import FastAPI
 
-from template_project.di_container import Container
-from template_project.endpoints.health import health
 import uvicorn
 
+from template_project.di_container import InfrastructureContainer, ServicesContainer
+from endpoints.health import health
 
-# Initialize DI container
-container = Container()
+
+# Initialize DI containers
+infrastructure = InfrastructureContainer()
+services = ServicesContainer(infrastructure=infrastructure)
 
 # Create FastAPI app
 app = FastAPI(title="Template Project API", version="0.1.0")

@@ -2,12 +2,26 @@
 
 from dependency_injector import containers, providers
 
-from template_project.core.config import AppConfig
-from template_project.infrastructure.client import APIClient
+from config import app_config, llm_config
+from template_project.infrastructure.api_client import APIClient
+from template_project.infrastructure.llm_client import LLMClient
 
 
-class Container(containers.DeclarativeContainer):
-    """Application dependency injection container."""
+class InfrastructureContainer(containers.DeclarativeContainer):
+    """Configs, secrets, and clients."""
 
-    config = providers.Singleton(AppConfig)
+    config = providers.Object(app_config)
+    llm_cfg = providers.Object(llm_config)
+
     api_client = providers.Singleton(APIClient, config=config)
+    llm_client = providers.Singleton(
+        LLMClient,
+        api_key=llm_cfg.provided.api_key,
+        llm_config=llm_cfg,
+    )
+
+
+class ServicesContainer(containers.DeclarativeContainer):
+    """Application services."""
+
+    infrastructure = providers.DependenciesContainer()
