@@ -2,7 +2,8 @@
 
 from dependency_injector import containers, providers
 
-from config import app_config, llm_config
+from config import settings
+from template_project.core.secret_provider import SecretProvider
 from template_project.infrastructure.api_client import APIClient
 from template_project.infrastructure.llm_client import LLMClient
 
@@ -10,14 +11,14 @@ from template_project.infrastructure.llm_client import LLMClient
 class InfrastructureContainer(containers.DeclarativeContainer):
     """Configs, secrets, and clients."""
 
-    config = providers.Object(app_config)
-    llm_cfg = providers.Object(llm_config)
+    secrets = providers.Singleton(SecretProvider, llm_config=settings.llm)
 
-    api_client = providers.Singleton(APIClient, config=config)
+    api_client = providers.Singleton(APIClient, config=settings.app)
+
     llm_client = providers.Singleton(
         LLMClient,
-        api_key=llm_cfg.provided.api_key,
-        llm_config=llm_cfg,
+        api_key=secrets.provided.anthropic_api_key.call(),
+        llm_config=settings.llm,
     )
 
 
