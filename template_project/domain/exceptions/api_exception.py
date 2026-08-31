@@ -1,0 +1,37 @@
+"""Base exception for every failure the API reports to a caller."""
+
+from template_project.domain.enums.api_error_code import APIErrorCode
+from template_project.domain.enums.api_severity_code import APISeverityCode
+
+
+class APIException(Exception):
+    """Domain failure carrying everything an error response needs.
+
+    Parameters
+    ----------
+    error_code : APIErrorCode, optional
+        Machine-readable identifier for the failure.
+    title : str, optional
+        Short human-readable summary.
+    detail : str, optional
+        Explanation of what went wrong, safe to show the caller.
+    type : str, optional
+        URI describing the HTTP status the failure maps to.
+    severity : APISeverityCode, optional
+        How badly the failure affects the caller.
+    """
+
+    def __init__(
+        self,
+        error_code: APIErrorCode = APIErrorCode.API_ERROR,
+        title: str = "Internal Server Error",
+        detail: str = "An unexpected error occurred.",
+        type: str = "https://httpstatuses.com/500",
+        severity: APISeverityCode = APISeverityCode.HIGH,
+    ) -> None:
+        self.error_code = error_code
+        self.title = title
+        self.detail = detail
+        self.type = type
+        self.severity = severity
+        super().__init__(self.detail)
