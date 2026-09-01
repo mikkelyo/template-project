@@ -8,45 +8,19 @@ from template_project.presentation.response_models.base.base_response_model impo
 
 
 class ValidationErrorResponse(BaseResponseModel):
-    """Body of a 400 response.
-
-    Attributes
-    ----------
-    errors : list[str]
-        One entry per field that failed validation.
-    """
+    """Body of a 400 response."""
 
     errors: list[str] = Field(..., alias="Errors", description="Validation failures.")
 
 
 class UnauthorizedErrorResponse(BaseResponseModel):
-    """Body of a 401 response.
-
-    Attributes
-    ----------
-    error : str
-        Why the request was rejected.
-    """
+    """Body of a 401 response."""
 
     error: str = Field(..., alias="Error", description="Why the request was rejected.")
 
 
 class DetailedErrorResponse(BaseResponseModel):
-    """Body of a 500 response, mirroring :class:`APIException`.
-
-    Attributes
-    ----------
-    type : str
-        URI describing the HTTP status the failure maps to.
-    title : str
-        Short human-readable summary.
-    detail : str
-        Explanation of what went wrong.
-    error_code : str
-        Machine-readable identifier for the failure.
-    severity : str
-        How badly the failure affects the caller.
-    """
+    """Body of a 500 response, mirroring :class:`APIException`."""
 
     type: str = Field(..., alias="Type", description="URI describing the status.")
     title: str = Field(..., alias="Title", description="Short summary.")

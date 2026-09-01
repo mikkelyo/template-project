@@ -4,15 +4,7 @@ from enum import Enum
 
 
 class MessageRole(str, Enum):
-    """Author of a conversation turn.
-
-    Attributes
-    ----------
-    USER : str
-        ``"user"`` — the human side of the conversation.
-    ASSISTANT : str
-        ``"assistant"`` — the model side of the conversation.
-    """
+    """Author of a conversation turn."""
 
     USER: str = "user"
     ASSISTANT: str = "assistant"

@@ -13,16 +13,5 @@ class CurrentUserPort(Protocol):
     """Hides where the identity comes from — HTTP headers, a body field or a token."""
 
     def get_current_user(self) -> CurrentUser:
-        """Return the caller the current request runs on behalf of.
-
-        Returns
-        -------
-        CurrentUser
-            Identity bound to the current request.
-
-        Raises
-        ------
-        AuthenticationException
-            If no identity is bound to the current request.
-        """
+        """Return the caller the current request runs on behalf of."""
         ...

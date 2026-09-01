@@ -38,7 +38,6 @@ config.py                     composition root: Dynaconf -> Pydantic `settings`
 settings.json                 non-secret configuration (committed)
 conftest.py                   sets required env vars before `config` is imported
 template_project/
-├── __init__.py               re-exports `container`
 ├── di_container.py           composition root: all wiring
 ├── context.py                ContextVar registry for request-scoped state
 ├── constants/                frozen strings: context keys, user-facing messages
@@ -100,17 +99,14 @@ singletons that hold it read the ContextVar on every call.
 
 1. **Port** — `application/ports/<name>_port.py`: `from __future__ import annotations`,
    a `@runtime_checkable class <Name>Port(Protocol)` whose docstring says what the port
-   *hides*, keyword-only methods with `...` bodies and NumPy docstrings. Re-export it
-   from `application/ports/__init__.py`.
+   *hides*, and keyword-only methods with `...` bodies.
 2. **Config** — `infrastructure/configurations/<system>_config.py`: a Pydantic model,
    every field with a default, validation bounds and a `description=`. Add it to
    `Settings` in `config.py` and give it a block in `settings.json`. Use
-   `InfixEnvNameString` / `PrefixEnvNameString` for names that must be scoped per
-   environment.
+   `EnvNameString` for names that must be scoped per environment.
 3. **Adapter** — `infrastructure/<vendor>/<name>_adapter.py`: a plain class with a
    keyword-only constructor whose docstring names the port it implements. Do not
    subclass the port. Translate vendor types *and* vendor exceptions at the boundary.
-   Telemetry adapters must never raise.
 4. **Use case** — `application/<thing>_service.py`: keyword-only constructor, every
    collaborator injected and typed by its port, raising domain exceptions only.
 5. **Wiring** — in `di_container.py`, add the adapter to `InfrastructureContainer`
@@ -129,7 +125,9 @@ singletons that hold it read the ContextVar on every call.
 
 ## Conventions
 
-- NumPy docstrings on every module, class, public method and function.
+- A one-line docstring on every module, class and public function. Signatures are
+  typed, so do not restate parameters and return values in prose; use a `#` comment
+  where the *reason* for the code is not obvious.
 - Keyword-only constructors and keyword-only public method parameters.
 - DTOs use `ConfigDict(validate_by_name=True)` with PascalCase `alias=`, so the wire
   contract is PascalCase while Python stays snake_case.

@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from template_project import container
+from template_project.di_container import container
 from template_project.presentation.api.security import AUTH_AND_CONTEXT
 from template_project.presentation.api.v1.error_responses import ERROR_RESPONSES
 from template_project.presentation.request_models.completion_request_model import (
@@ -26,18 +26,7 @@ router = APIRouter(tags=["completions"])
 async def create_completion(
     request_model: CompletionRequestModel,
 ) -> CompletionResponseModel:
-    """Answer the caller's prompt with the language model.
-
-    Parameters
-    ----------
-    request_model : CompletionRequestModel
-        Body of the request.
-
-    Returns
-    -------
-    CompletionResponseModel
-        The model's answer and the caller it was produced for.
-    """
+    """Answer the caller's prompt with the language model."""
     completion_service = container.services.completion_service()
     result = await completion_service.complete(prompt=request_model.prompt)
     return CompletionResponseModel(

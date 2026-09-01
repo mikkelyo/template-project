@@ -16,21 +16,7 @@ from template_project.domain.exceptions.validation_exception import ValidationEx
 
 
 class CompletionService:
-    """Turns a caller's prompt into an answer from the language model.
-
-    Parameters
-    ----------
-    logger : Logger
-        Logger used for operational messages.
-    completion : CompletionPort
-        Language model the prompt is sent to.
-    current_user : CurrentUserPort
-        Identity of the caller the answer is produced for.
-    metrics : MetricsPort
-        Recorder for request counts and latencies.
-    system_prompt : str
-        Instructions that frame every conversation this service starts.
-    """
+    """Turns a caller's prompt into an answer from the language model."""
 
     def __init__(
         self,
@@ -48,25 +34,7 @@ class CompletionService:
         self._system_prompt = system_prompt
 
     async def complete(self, *, prompt: str) -> CompletionResult:
-        """Answer ``prompt`` on behalf of the current caller.
-
-        Parameters
-        ----------
-        prompt : str
-            Question submitted by the caller.
-
-        Returns
-        -------
-        CompletionResult
-            The model's answer and the caller it was produced for.
-
-        Raises
-        ------
-        ValidationException
-            If ``prompt`` is blank.
-        AuthenticationException
-            If no caller is bound to the current request.
-        """
+        """Answer ``prompt`` on behalf of the current caller."""
         if not prompt.strip():
             raise ValidationException(
                 detail=StaticMessages.EMPTY_PROMPT, field="Prompt"

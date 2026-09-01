@@ -6,13 +6,7 @@ from template_project.domain.exceptions.api_exception import APIException
 
 
 class AuthenticationException(APIException):
-    """The request carries no usable identity.
-
-    Parameters
-    ----------
-    detail : str, optional
-        Explanation of why authentication failed.
-    """
+    """The request carries no usable identity."""
 
     def __init__(self, detail: str = "The request is not authenticated.") -> None:
         super().__init__(

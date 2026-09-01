@@ -8,15 +8,7 @@ from template_project.presentation.response_models.base.base_response_model impo
 
 
 class CompletionResponseModel(BaseResponseModel):
-    """Body of a successful ``POST /v1/completions``.
-
-    Attributes
-    ----------
-    answer : str
-        Text produced by the model.
-    requested_by : str
-        Identifier of the caller the answer was produced for.
-    """
+    """Body of a successful ``POST /v1/completions``."""
 
     answer: str = Field(..., alias="Answer", description="Text produced by the model.")
     requested_by: str = Field(

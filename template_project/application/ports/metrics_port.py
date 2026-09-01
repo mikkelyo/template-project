@@ -7,28 +7,12 @@ from typing import Protocol, runtime_checkable
 
 @runtime_checkable
 class MetricsPort(Protocol):
-    """Hides the metrics backend and guarantees telemetry never breaks a request."""
+    """Hides the metrics backend from the use cases that record measurements."""
 
     def increment(self, *, name: str, value: int = 1) -> None:
-        """Add ``value`` to the counter ``name``.
-
-        Parameters
-        ----------
-        name : str
-            Counter name.
-        value : int, optional
-            Amount to add.
-        """
+        """Add ``value`` to the counter ``name``."""
         ...
 
     def record_duration(self, *, name: str, seconds: float) -> None:
-        """Record how long an operation took.
-
-        Parameters
-        ----------
-        name : str
-            Timer name.
-        seconds : float
-            Measured duration.
-        """
+        """Record how long an operation took."""
         ...

@@ -8,7 +8,7 @@ from dependency_injector import providers
 from fastapi.testclient import TestClient
 
 from app import app
-from template_project import container
+from template_project.di_container import container
 
 AUTH_HEADERS = {"Authorization": "Bearer test-service-api-key"}
 VALID_BODY = {"Prompt": "What is six times seven?", "UserId": "u-1", "UserName": "Ada"}

@@ -2,11 +2,11 @@
 
 from anthropic import AsyncAnthropic
 
-from template_project import container
 from template_project.application.completion_service import CompletionService
 from template_project.application.ports.completion_port import CompletionPort
 from template_project.application.ports.current_user_port import CurrentUserPort
 from template_project.application.ports.metrics_port import MetricsPort
+from template_project.di_container import container
 from template_project.infrastructure.anthropic.anthropic_completion_adapter import (
     AnthropicCompletionAdapter,
 )

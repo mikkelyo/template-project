@@ -11,9 +11,9 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
-from template_project import container
 from template_project.constants.context_keys import ContextKeys
 from template_project.context import context
+from template_project.di_container import container
 from template_project.infrastructure.logging.logger_factory import configure_logging
 from template_project.presentation.api import register_exception_handlers, router
 
@@ -26,18 +26,7 @@ REQUEST_ID_HEADER = "X-Request-Id"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Open external clients on startup and close them on shutdown.
-
-    Parameters
-    ----------
-    app : FastAPI
-        The application being served.
-
-    Yields
-    ------
-    None
-        Control is handed back while the application serves traffic.
-    """
+    """Open external clients on startup and close them on shutdown."""
     anthropic_client = container.infrastructure.anthropic_client()
     example_client = container.infrastructure.example_client()
     logger.info("Started %s version %s.", APP_NAME, settings.version)
@@ -71,20 +60,7 @@ app.add_middleware(
 async def access_log_middleware(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
-    """Tag each request with a correlation id and log how it was served.
-
-    Parameters
-    ----------
-    request : Request
-        Incoming request.
-    call_next : Callable[[Request], Awaitable[Response]]
-        The rest of the middleware stack.
-
-    Returns
-    -------
-    Response
-        The response, carrying the correlation id back to the caller.
-    """
+    """Tag each request with a correlation id and log how it was served."""
     request_id = request.headers.get(REQUEST_ID_HEADER, str(uuid.uuid4()))
     context.set(ContextKeys.REQUEST_ID, request_id)
     started = time.perf_counter()

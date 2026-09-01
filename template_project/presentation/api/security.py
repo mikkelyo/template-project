@@ -18,18 +18,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 async def require_api_key(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> None:
-    """Reject requests that do not carry the configured bearer token.
-
-    Parameters
-    ----------
-    credentials : HTTPAuthorizationCredentials | None
-        Bearer credentials parsed from the ``Authorization`` header.
-
-    Raises
-    ------
-    HTTPException
-        If the token is absent or does not match the configured key.
-    """
+    """Reject requests that do not carry the configured bearer token."""
     if credentials is None or credentials.credentials != settings.service_api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -38,18 +27,7 @@ async def require_api_key(
 
 
 async def set_current_user_from_body(request: Request) -> None:
-    """Bind the caller described in the request body to the request context.
-
-    Parameters
-    ----------
-    request : Request
-        Incoming request; its body is cached, so the route still parses it.
-
-    Raises
-    ------
-    AuthenticationException
-        If the body identifies no caller.
-    """
+    """Bind the caller described in the request body to the request context."""
     body = await request.json()
     user_id = body.get("UserId")
     user_name = body.get("UserName")

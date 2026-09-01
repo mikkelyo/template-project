@@ -18,30 +18,13 @@ if TYPE_CHECKING:
 
 
 class ContextVarCurrentUserAdapter:
-    """Implements :class:`CurrentUserPort`, so use cases never touch HTTP state.
-
-    Parameters
-    ----------
-    logger : Logger
-        Logger for rejected lookups.
-    """
+    """Implements :class:`CurrentUserPort`, so use cases never touch HTTP state."""
 
     def __init__(self, *, logger: Logger) -> None:
         self._logger = logger
 
     def get_current_user(self) -> CurrentUser:
-        """Return the caller bound to the current request context.
-
-        Returns
-        -------
-        CurrentUser
-            Identity bound by the authentication dependency.
-
-        Raises
-        ------
-        AuthenticationException
-            If nothing was bound to the current context.
-        """
+        """Return the caller bound to the current request context."""
         current_user: CurrentUser | None = context.get(ContextKeys.CURRENT_USER)
         if current_user is None:
             self._logger.warning(StaticMessages.MISSING_CURRENT_USER)

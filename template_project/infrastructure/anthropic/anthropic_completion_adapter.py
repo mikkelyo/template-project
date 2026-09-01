@@ -29,23 +29,7 @@ VENDOR_ROLES: dict[MessageRole, Literal["user", "assistant"]] = {
 
 
 class AnthropicCompletionAdapter:
-    """Implements :class:`CompletionPort`, so the Anthropic SDK stays in this layer.
-
-    Parameters
-    ----------
-    client : AsyncAnthropic
-        SDK client used for every call; async so the event loop is never blocked.
-    logger : Logger
-        Logger for operational messages.
-    current_user : CurrentUserPort
-        Caller the request is attributed to, for Anthropic's abuse tracking.
-    model : str
-        Model identifier requests are sent to.
-    max_tokens : int
-        Upper bound on answer length.
-    temperature : float
-        Sampling randomness.
-    """
+    """Implements :class:`CompletionPort`, so the Anthropic SDK stays in this layer."""
 
     def __init__(
         self,
@@ -65,26 +49,7 @@ class AnthropicCompletionAdapter:
         self._temperature = temperature
 
     async def complete(self, *, messages: Sequence[Message], system: str) -> str:
-        """Answer a conversation with free-form text.
-
-        Parameters
-        ----------
-        messages : Sequence[Message]
-            Conversation turns in chronological order.
-        system : str
-            Instructions that frame the whole conversation.
-
-        Returns
-        -------
-        str
-            The model's answer.
-
-        Raises
-        ------
-        APIException
-            If the call failed or the model returned no text block; vendor errors
-            never leave this layer.
-        """
+        """Answer a conversation with free-form text."""
         try:
             response = await self._client.messages.create(
                 model=self._model,
@@ -110,28 +75,7 @@ class AnthropicCompletionAdapter:
         schema: type[SchemaT],
         description: str,
     ) -> SchemaT:
-        """Answer a conversation with an instance of ``schema``.
-
-        Parameters
-        ----------
-        messages : Sequence[Message]
-            Conversation turns in chronological order.
-        schema : type[SchemaT]
-            Model the answer is validated against, exposed as a forced tool call.
-        description : str
-            What the model should put into the schema.
-
-        Returns
-        -------
-        SchemaT
-            The validated answer.
-
-        Raises
-        ------
-        APIException
-            If the call failed or the model returned no tool call; vendor errors
-            never leave this layer.
-        """
+        """Answer a conversation with an instance of ``schema``."""
         try:
             response = await self._client.messages.create(
                 model=self._model,
@@ -154,49 +98,19 @@ class AnthropicCompletionAdapter:
         return schema.model_validate(block.input)
 
     def _caller_metadata(self) -> MetadataParam:
-        """Attribute the call to the current caller.
-
-        Returns
-        -------
-        MetadataParam
-            The ``metadata`` payload Anthropic uses for abuse tracking.
-        """
+        """Attribute the call to the current caller."""
         return MetadataParam(user_id=self._current_user.get_current_user().user_id)
 
     @staticmethod
     def _to_vendor_messages(messages: Sequence[Message]) -> list[MessageParam]:
-        """Convert domain turns into the SDK's message payload.
-
-        Parameters
-        ----------
-        messages : Sequence[Message]
-            Conversation turns in chronological order.
-
-        Returns
-        -------
-        list[MessageParam]
-            Payload accepted by the SDK.
-        """
+        """Convert domain turns into the SDK's message payload."""
         return [
             MessageParam(role=VENDOR_ROLES[m.role], content=m.content) for m in messages
         ]
 
     @staticmethod
     def _to_vendor_tool(*, schema: type[BaseModel], description: str) -> ToolParam:
-        """Expose ``schema`` as a tool definition the model must call.
-
-        Parameters
-        ----------
-        schema : type[BaseModel]
-            Model describing the expected answer.
-        description : str
-            What the model should put into the schema.
-
-        Returns
-        -------
-        ToolParam
-            Tool definition accepted by the SDK.
-        """
+        """Expose ``schema`` as a tool definition the model must call."""
         return ToolParam(
             name=schema.__name__,
             description=description,

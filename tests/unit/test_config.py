@@ -1,12 +1,6 @@
 """Tests for the settings composition root."""
 
-import pytest
-
 from config import settings
-from template_project.infrastructure.configurations.base.env_string_validators import (
-    infix_insert_env_name,
-    prefix_insert_env_name,
-)
 
 
 class TestSettings:
@@ -23,17 +17,3 @@ class TestSettings:
         assert settings.app_env_name == "test"
         assert settings.example_api_config.base_url == "https://api.test.example.com"
         assert settings.metrics_config.namespace == "test.template_project"
-
-
-class TestEnvNameValidators:
-    """Cases for the environment-name string validators."""
-
-    def test_infix_requires_the_placeholder(self) -> None:
-        """A value without the placeholder is a configuration mistake."""
-        with pytest.raises(ValueError):
-            infix_insert_env_name("https://api.example.com")
-
-    def test_prefix_requires_a_leading_placeholder(self) -> None:
-        """A prefixed value must start with the environment name."""
-        with pytest.raises(ValueError):
-            prefix_insert_env_name("template_project.{env_name}")

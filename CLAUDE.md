@@ -29,6 +29,9 @@ Adapters satisfy ports structurally — never subclass a port; assert
 `tests/unit/test_di_container.py`. See README.md for the layer map and the steps for
 adding a port, adapter and use case.
 
+Docstrings are one line. Signatures are typed, so never restate parameters, returns
+or attributes in prose — use a `#` comment where the *reason* is not obvious.
+
 ## Commands
 `uv` is used for all tooling — running scripts, tests, linters, and formatters.
 

@@ -11,11 +11,5 @@ import pytest  # noqa: E402
 
 @pytest.fixture
 def anyio_backend() -> str:
-    """Run anyio-driven tests on asyncio.
-
-    Returns
-    -------
-    str
-        Name of the async backend.
-    """
+    """Run anyio-driven tests on asyncio."""
     return "asyncio"

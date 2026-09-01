@@ -6,15 +6,7 @@ from template_project.domain.exceptions.api_exception import APIException
 
 
 class ValidationException(APIException):
-    """A value supplied by the caller is not acceptable.
-
-    Parameters
-    ----------
-    detail : str, optional
-        Explanation of what is wrong with the value.
-    field : str | None, optional
-        Name of the offending field, when the failure is attributable to one.
-    """
+    """A value supplied by the caller is not acceptable."""
 
     def __init__(
         self,

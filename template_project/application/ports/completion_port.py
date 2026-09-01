@@ -19,20 +19,7 @@ class CompletionPort(Protocol):
     """Hides which vendor backs the model, how it is authenticated and called."""
 
     async def complete(self, *, messages: Sequence[Message], system: str) -> str:
-        """Answer a conversation with free-form text.
-
-        Parameters
-        ----------
-        messages : Sequence[Message]
-            Conversation turns in chronological order.
-        system : str
-            Instructions that frame the whole conversation.
-
-        Returns
-        -------
-        str
-            The model's answer.
-        """
+        """Answer a conversation with free-form text."""
         ...
 
     async def complete_structured(
@@ -42,20 +29,5 @@ class CompletionPort(Protocol):
         schema: type[SchemaT],
         description: str,
     ) -> SchemaT:
-        """Answer a conversation with an instance of ``schema``.
-
-        Parameters
-        ----------
-        messages : Sequence[Message]
-            Conversation turns in chronological order.
-        schema : type[SchemaT]
-            Model the answer is validated against.
-        description : str
-            What the model should put into the schema.
-
-        Returns
-        -------
-        SchemaT
-            The validated answer.
-        """
+        """Answer a conversation with an instance of ``schema``."""
         ...

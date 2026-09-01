@@ -22,31 +22,7 @@ from template_project.infrastructure.configurations.security_config import (
 
 
 class Settings(BaseModel):
-    """Every value the process needs, grouped by the system it configures.
-
-    Attributes
-    ----------
-    anthropic_config : AnthropicConfig
-        Model selection and sampling behaviour.
-    metrics_config : MetricsConfig
-        Metric naming and whether metrics are emitted.
-    security_config : SecurityConfig
-        Inbound request handling, such as accepted CORS origins.
-    example_api_config : ExampleApiConfig
-        Connection settings for the downstream REST API.
-    version : str
-        Version reported by the API and its OpenAPI document.
-    is_local : bool
-        Whether the process runs on a developer machine.
-    log_level : str
-        Minimum level written to stdout.
-    app_env_name : str
-        Deployment environment, interpolated into environment-scoped names.
-    anthropic_api_key : str
-        Credential for the Anthropic API. Required; supply it as a secret.
-    service_api_key : str
-        Bearer token callers of this service must present. Required.
-    """
+    """Every value the process needs, grouped by the system it configures."""
 
     # Infrastructure services
     anthropic_config: AnthropicConfig = AnthropicConfig()

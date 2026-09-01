@@ -6,15 +6,7 @@ from template_project.domain.enums.message_role import MessageRole
 
 
 class Message(BaseModel):
-    """One conversation turn, independent of any model vendor.
-
-    Attributes
-    ----------
-    role : MessageRole
-        Who produced the turn.
-    content : str
-        Text of the turn.
-    """
+    """One conversation turn, independent of any model vendor."""
 
     role: MessageRole = Field(..., description="Who produced the turn.")
     content: str = Field(..., description="Text of the turn.")
