@@ -68,6 +68,9 @@ provider gets a case in `tests/unit/test_di_container.py` — same rules as the 
 ## Shape
 - Ship as Docker on HF Spaces, port 7860 — copy the other app's `Dockerfile` and the
   YAML front-matter block in `README.md`. Template's `app.py` binds 8080 locally.
+- **The HF dataset is the only durable store.** Recipes and `history.jsonl` live there;
+  everything else is container-local and disposable by design. A redeploy costs a round,
+  never a recipe.
 - All swipe state in a single in-memory singleton behind `SwipeStorePort`. No DB.
   `{round_id: {recipe_name: set[uuid]}}` plus the round's participant set. No timestamps.
 - Strip the template's bearer-token auth off these routes (`SERVICE_API_KEY`,
@@ -122,9 +125,12 @@ participant is in the round until someone hits reset. That is the whole lifecycl
    is all the identity there is, and it exists only for the chip.
 3. **Any number of swipers.** Two of us on a Tuesday, five when people are over. The
    deck and the match rule don't care about the count.
-4. **One shared, seeded deck per round.** Same dishes in the same order for everyone;
-   each uuid stores only its position. Overlap by construction, so matches come fast —
-   and someone joining late lands on the same cards we already voted on.
+4. **One shared, seeded deck per round — the whole dataset, every round.** No sampling,
+   no deck size: every recipe is in every round, shuffled with the round's seed, same
+   order for everyone. Each uuid stores only its position. Overlap by construction, so
+   matches come fast, and someone joining late lands on the same cards we already voted
+   on. The deck length is a *ceiling*, not an expectation — a match fires long before
+   anyone reaches the end.
 5. **Unanimity, no quorum.** A match is a dish that **every** participant in the round
    has swiped yes on. Not a majority, not "most", not a threshold — all of them. One no
    means that dish is out for this round.
@@ -138,7 +144,15 @@ participant is in the round until someone hits reset. That is the whole lifecycl
    positions and matches for everyone. Because reset is always one tap away, nothing
    else in the system needs to expire, prune, or guess.
 9. **Fires once per dish per round**, broadcast to everyone. Overlay offers **Accept**
-   (ends the round) or **Keep swiping**.
+   (ends the round) or **Keep swiping**. It can carry *several* dishes at once: a client
+   that buffered swipes offline posts them in one go and can complete more than one
+   intersection, so the overlay takes a list.
+10. **A round of one cannot conclude.** Matches only fire once there are **two or more**
+   participants. With a single participant "everyone agreed" is trivially true on the
+   first Yes, and whoever opens the app first would get a dinner overlay before anyone
+   else has opened it. Likes still accumulate while you're alone — the dish just fires
+   later, when someone agrees. This is about who *counts*, not hesitation: once a match
+   fires, it's a match, no confirmation dance.
 
 ## Failure is a real outcome
 The deck runs out and nothing was unanimous. Don't hide it, don't soften it, don't
@@ -153,8 +167,16 @@ But name which of the two ways the round died, because they mean different thing
 - **Someone stopped swiping and the rest of us are done.** Not a no — an absence. Name
   them so we know why nothing landed: *"Waiting on 🦊 (4/30)"*.
 
-Both offer the same two buttons — **Generate a new dish** and **Reset**. The sad
+There is a third end-of-deck state that is neither of those: **you are through the deck
+and you are the only participant.** Nothing was rejected and nobody is late — the round
+just hasn't got a second person yet. Its own copy: *"Through the deck. 6 liked —
+waiting for someone to swipe."*
+
+All three offer the same two buttons — **Generate a new dish** and **Reset**. The sad
 message is the honest answer, and reset is what makes it cheap to be wrong.
+
+Reaching the end at all is rare now that the deck is the whole dataset. Keep the screen,
+don't design around it.
 
 ## Joining — the whole lifecycle
 Under unanimity, *when* someone becomes a participant is the highest-stakes decision in
@@ -196,7 +218,15 @@ If a dish matched and *then* someone new swipes in, the match is not retracted. 
 go into the round's match list and stay. Recomputing history against a changed
 participant set would mean a dish could un-win while you're reading the ingredients.
 
+Someone who joins after a match has fired gets the overlay too, mid-deck — Accept ends
+the round for everyone, and a late joiner must not be left staring at a dead screen.
+
 ### Reset is a new round, and everyone finds out
+Reset is available to **anyone with the URL**, spectators included — the person who spots
+the problem shouldn't have to swipe first to fix it. It works from the fail screen and
+from under a match overlay. One confirm tap is the only guard, and that's the whole
+threat model.
+
 Reset mints a new `round_id`, a new seed and an empty participant set.
 - Live clients get a `round_reset` SSE event carrying the new round, and wipe their
   local like set and position.
@@ -205,6 +235,36 @@ Reset mints a new `round_id`, a new seed and an empty participant set.
   that was asleep, offline, or behind a napping Space.
 - After a reset nobody is a participant — including whoever pressed it. Everyone
   re-enters the same way they did the first time: by swiping.
+
+### Container restarts vs. Reset
+All round state lives in the container. A redeploy or a Space wake-up wipes `round_id`,
+seed, deck, participants, positions, matches and SSE queues. Only the HF dataset is
+durable — a restart costs a round, never a recipe.
+
+In practice this bites *between* rounds, not during one: the Space sleeps on long idle,
+so Tuesday's round is long dead by Saturday. Don't over-engineer for a mid-dinner
+redeploy.
+
+The client keeps two sets in localStorage, not one: `liked` **and** `seen` (every name
+voted on, yes or no). Likes are names, so they survive a new deck; without `seen` you
+re-swipe everything you already rejected, which was tolerable at 30 cards and is not at
+150.
+
+So the round carries an origin, and the client branches on it:
+
+- `origin: "cold_start"` — server had no round. Keep `seen`, silently advance past
+  anything already voted on. The restart is invisible.
+- `origin: "user_reset"` — someone pressed the button. Clear everything client-side and
+  swipe from card zero. Reset stays a real clean slate; that is its whole virtue.
+
+Two consequences, accepted rather than fixed:
+
+- **The seed does not buy restart recovery.** It isn't persisted, so a restarted server
+  rolls a new one. Its only jobs are that everyone in a live round shares an order, and
+  that rounds don't all open on the same five cards.
+- **"Once per dish per round" is really once per dish per server lifetime.** After a wipe
+  the intersection recomputes and an already-fired dish fires again. Harmless — that's
+  the self-heal working.
 
 ### When someone stops swiping
 This is the one real hole in "join by swiping, never leave". She swipes four cards, the
@@ -280,13 +340,15 @@ Same behaviour, same wording:
 Both of these were open. Closing them, because leaving them open is what makes me
 build the wrong thing twice.
 
-**Show live vote progress on the card?** Yes — show it, as a muted `2/3` on the card,
-never as *who* voted. Under unanimity the count is the only thing that tells you
-whether the round is still winnable, and hiding it to feel more like Tinder costs the
-one piece of information the rule creates. Per-person attribution is the part that
-would make it a social pressure device, so that stays hidden: a number, not names.
-Server sends it in the roster payload; it can only ever go up, so a stale count is
-harmless.
+**Show live vote progress on the card?** Yes, as a muted `2/3`, never *who* voted — the
+count is the only thing that tells you whether the round is still winnable, and
+per-person attribution is what would turn it into a pressure device.
+
+But **retrospective only: show the count on a card once every participant has passed
+it.** Predictive counts break the staggered case. If I swipe the deck first and she
+opens later, a visible `1/2` marks exactly which cards I pre-liked, and she stops voting
+and starts shopping my shortlist. A count on a card someone hasn't reached is
+information about them, not about the dish.
 
 **Log what we ate?** Yes, but as the smallest possible thing: `POST /v1/round/end`
 appends one line to `history.jsonl` in the same HF dataset —
@@ -313,14 +375,23 @@ No `Swipe` model in the end. A swipe isn't a thing that persists; it's a message
 mutates a like set. The wire DTO (`SwipeRequestModel`) is the only shape it needs.
 
 ## Deck construction
-- At round creation: take every recipe name from `RecipeRepositoryPort`, shuffle with
-  `random.Random(seed)`, take the first `deck_size` (30, from `settings.json`).
-- The seed is stored on the round, so the deck is reproducible from `{seed, dataset}`
-  and I can rebuild it after a restart without persisting the list.
+- At round creation: take **every** recipe name from `RecipeRepositoryPort` and shuffle
+  with `random.Random(seed)`. No sampling, no `deck_size`. The full dataset, every round.
+- Shuffling matters *more* under a full deck, not less: the content is identical every
+  round, so order is the only source of variety.
 - `POST /v1/generate` appends the new name to the end of the live deck rather than
   reshuffling. Everyone's position stays valid, and the new card lands where whoever
-  asked for it is about to reach it.
-- Fewer recipes in the dataset than `deck_size` → the deck is just all of them.
+  asked for it is about to reach it. Its justification is now "we've seen these and want
+  something new", not "the deck ran dry".
+- A late joiner is not punished by a long deck: matches fire retroactively, so he only
+  has to reach the first card the others both liked — usually early — not our position.
+- `GET /v1/round` ships the whole deck in one payload. A few hundred recipes is a small
+  page load; don't build lazy fetching for it.
+
+**Deferred lever:** pseudorandom sampling instead of the full deck, when the dataset gets
+big enough that rounds stop reaching a match before people get bored. Practical trigger:
+deck over ~100 and we notice we aren't finishing. Written down so it's a decision already
+made, not a surprise.
 
 ## SwipeStorePort — the whole state
 One `Singleton` adapter, one lock, this shape:
@@ -337,10 +408,11 @@ liked, position)`, `matches()`, `roster()`. Every mutation is under an
 `asyncio.Lock` — SSE fan-out plus concurrent swipes on one process makes the
 read-modify-write of `matches` a real race, not a hypothetical.
 
-Match computation, on every swipe:
-`set.intersection(*likes.values()) - {m.recipe.name for m in matches}` → anything left
-is new, gets appended to `matches` and broadcast. Empty participant set intersects to
-nothing, which is the correct answer for a round nobody has swiped in yet.
+Match computation, on every swipe: if `len(participants) < 2`, no match can fire.
+Otherwise `set.intersection(*likes.values()) - {m.recipe.name for m in matches}` →
+anything left is new, gets appended to `matches` and broadcast. It can be more than one
+dish when a client posts buffered swipes, so the result is a list all the way to the
+overlay.
 
 ## SSE
 - `asyncio.Queue` per connected client, held in the same singleton. Broadcast = put the
@@ -364,7 +436,6 @@ New blocks alongside the template's `anthropic_config`:
   "recipes_path": "recipes.jsonl",
   "history_path": "history.jsonl"
 },
-"round_config": { "deck_size": 30 },
 "generation_config": { "system_prompt": "..." }
 ```
 
@@ -379,9 +450,10 @@ Unit only, `pytest`, no live HF or Anthropic calls anywhere.
 - `test_swipe_store_adapter.py` — the match rule is the app, so this is the file that
   matters: unanimity with 2/3/5 participants, one no kills a dish, a late joiner fires
   a retroactive match, a fired match survives a new participant joining, reset empties
-  everything, a swipe from an unknown uuid joins them.
-- `test_deck_service.py` — same seed gives the same deck, generate appends without
-  disturbing positions, a dataset smaller than `deck_size`.
+  everything, a swipe from an unknown uuid joins them, **a solo participant's Yes fires
+  nothing**, and one POST completing several intersections returns them all.
+- `test_deck_service.py` — the deck is every recipe in the dataset, same seed gives the
+  same order, generate appends without disturbing positions.
 - `test_hf_dataset_recipe_adapter.py` — mocked `huggingface-hub`, duplicate-name skip
   on write, vendor exceptions translated to domain ones at the boundary.
 - `test_recipe_generator_adapter.py` — mocked Anthropic client, forced-tool-use schema
@@ -418,7 +490,8 @@ dataset both apps share.
 Also explicitly not doing, so I don't relitigate at 22:00 on a build night: multiple
 concurrent rounds, a leave button, per-person deck filters, ambition-based filtering,
 a kick/drop affordance, ingredient search, a "who voted no" reveal, and any form of
-expiry, timeout or idle sweep.
+expiry, timeout or idle sweep. Also: no deck size, no per-round recipe sampling — the
+deck is the dataset until the deferred lever above says otherwise.
 
 ## Ambition is ignored
 The field exists in the dataset but v1 neither shows nor filters on it. I'm the chef —
