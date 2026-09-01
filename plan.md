@@ -349,8 +349,12 @@ dish name.
 **It has to outlive the round.** Accept ends the round; if you then pocket the phone and
 reopen it in the shop, the server has no round, you get a fresh one, and the list you
 came to buy is gone. So the accepted dish is written to localStorage and the app opens on
-it — not on card one — until you dismiss it. That's the moment the list is actually
-needed.
+it — not on card one — **until someone hits Reset**. Reset keeps its single meaning: it
+is what ends dinner and starts the next round, here as everywhere else.
+
+One consequence to know: Reset is for everyone, so if she starts tomorrow's round while
+you're still in the aisle, your winner screen goes with it. The copy button is the
+escape — once it's in Notes it doesn't depend on the app at all.
 
 ## Match overlay: "Import to notes"
 Lift the share/copy button from `shopping-list-maker`'s `static/index.html` verbatim.
