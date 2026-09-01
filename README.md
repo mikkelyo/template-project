@@ -23,6 +23,17 @@ curl -X POST http://127.0.0.1:8080/v1/completions \
 Secrets may also live in `.secrets.json` or `.env` (both gitignored); non-secret
 values belong in the committed `settings.json`. Interactive docs are at `/apidocs`.
 
+## Starting a new project from this template
+
+```bash
+uv run python scripts/rename_project.py my_app   # rewrites the name, moves the package
+uv lock && uv run pytest
+```
+
+Then delete the `example_client` / `example_api_config` scaffolding: it exists only to
+demonstrate the `RestClient` + factory-function pattern, and it is referenced from
+`app.py`, `config.py`, `di_container.py` and two test modules.
+
 ```bash
 uv run pytest          # tests
 uv run ruff check .    # lint
@@ -37,12 +48,13 @@ app.py                        composition root: middleware, routers, lifespan
 config.py                     composition root: Dynaconf -> Pydantic `settings`
 settings.json                 non-secret configuration (committed)
 conftest.py                   sets required env vars before `config` is imported
+scripts/rename_project.py     one-shot rename when cloning this template
 template_project/
 ├── di_container.py           composition root: all wiring
 ├── context.py                ContextVar registry for request-scoped state
 ├── constants/                frozen strings: context keys, user-facing messages
 ├── domain/                   pure: no framework, no I/O
-│   ├── enums/                APIErrorCode, APISeverityCode, Environment, MessageRole
+│   ├── enums/                APIErrorCode, Environment, MessageRole
 │   ├── exceptions/           APIException + Authentication/Validation subclasses
 │   ├── user/                 CurrentUser
 │   └── conversation/         Message, CompletionResult
@@ -96,6 +108,10 @@ POST /v1/completions
 the container overrides the root `current_user_service` dependency with it, and the
 singletons that hold it read the ContextVar on every call.
 
+Every failure leaves through `exception_handlers.py`, including ones nothing
+anticipated: an `Exception` handler renders them as the same error DTO and logs the
+traceback, so no caller ever sees a bare 500.
+
 ## Adding a port, adapter and use case
 
 1. **Port** — `application/ports/<name>_port.py`: `from __future__ import annotations`,
@@ -119,8 +135,10 @@ singletons that hold it read the ContextVar on every call.
    application layer a zero-argument callable.
 6. **Endpoint** — add `presentation/api/v1/<feature>_endpoints.py`, resolve the use case
    inside the handler body with `container.services.<x>()`, apply
-   `dependencies=AUTH_AND_CONTEXT` and `responses=ERROR_RESPONSES`, and include the
-   router from `presentation/api/v1/__init__.py`.
+   `responses=ERROR_RESPONSES`, and include the router from
+   `presentation/api/v1/__init__.py`. Pick the dependency list by whether the route has
+   a body: `AUTH_AND_CONTEXT` reads the caller from it, so a GET or any body-less route
+   takes `AUTH_ONLY` instead and reaches the caller some other way.
 7. **Tests** — one module per adapter and use case in `tests/unit/`, every collaborator a
    `MagicMock()`, and a case in `tests/unit/test_di_container.py` that resolves the new
    provider and asserts it satisfies its port. That file is the only guard against

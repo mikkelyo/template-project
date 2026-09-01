@@ -85,3 +85,14 @@ class TestCreateCompletion:
         response = client.post("/v1/completions", json=body, headers=AUTH_HEADERS)
 
         assert response.status_code == 401
+
+    def test_rejects_a_body_that_is_not_json(self, client: TestClient) -> None:
+        """The caller dependency reads the body before FastAPI validates it."""
+        response = client.post(
+            "/v1/completions",
+            content="not json",
+            headers={**AUTH_HEADERS, "Content-Type": "application/json"},
+        )
+
+        assert response.status_code == 400
+        assert response.json()["ErrorCode"] == "api/validation-error"

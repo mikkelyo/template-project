@@ -11,11 +11,14 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
 from template_project.constants.static_messages import StaticMessages
+from template_project.di_container import container
 from template_project.domain.enums.api_error_code import APIErrorCode
 from template_project.domain.exceptions.api_exception import APIException
 from template_project.presentation.response_models.base.error_response_models import (
     ErrorResponse,
 )
+
+logger = container.infrastructure.logger()
 
 # The only place that knows which HTTP status a domain failure is served as.
 STATUS_BY_ERROR_CODE: dict[APIErrorCode, int] = {
@@ -78,12 +81,25 @@ async def api_exception_handler(request: Request, exc: APIException) -> JSONResp
     )
 
 
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Render a failure nothing anticipated, so no caller ever sees a bare 500."""
+    # Detail is deliberately generic: the traceback belongs in the log, not the body.
+    logger.exception("Unhandled error serving %s %s.", request.method, request.url.path)
+    return _problem(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=StaticMessages.UNEXPECTED_ERROR,
+        error_code=APIErrorCode.API_ERROR,
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Attach every handler above to ``app``.
 
     ``APIException`` covers its subclasses: Starlette walks the exception's MRO
-    when it looks a handler up.
+    when it looks a handler up. The ``Exception`` handler is the last resort;
+    Starlette re-raises after it responds, so the failure still reaches the logs.
     """
     app.add_exception_handler(RequestValidationError, request_validation_error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(APIException, api_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(Exception, unhandled_exception_handler)

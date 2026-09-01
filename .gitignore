@@ -1,9 +1,6 @@
 # Development directories
 dev/
 
-# GitHub specific
-.github/
-
 # Secrets
 .secrets
 .secrets.json
