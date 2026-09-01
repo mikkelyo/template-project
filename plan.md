@@ -37,12 +37,11 @@ its flat layout. Anything I lift from there gets re-homed into a layer.
 ```
 domain/           Recipe, Swipe, MatchResult, Round — pure Pydantic
 application/
-  ports/          RecipeRepositoryPort, RecipeGeneratorPort, SwipeStorePort
+  ports/          RecipeRepositoryPort, SwipeStorePort
   swipe_service.py       record a swipe, decide a match
   deck_service.py        next card for a uuid
 infrastructure/
   huggingface/    HfDatasetRecipeAdapter  (huggingface-hub, recipes.jsonl)
-  anthropic/      AnthropicRecipeGeneratorAdapter (reuse template's anthropic adapter)
   memory/         InMemorySwipeStoreAdapter (dict, round-scoped)
 presentation/
   api/v1/         swipe/deck/events endpoints
@@ -51,19 +50,22 @@ presentation/
 Ports stay `@runtime_checkable` Protocols, adapters conform structurally, and every new
 provider gets a case in `tests/unit/test_di_container.py` — same rules as the template.
 
-## Anthropic + Hugging Face, same as the other app
+## Hugging Face only — this app does not generate recipes
 - **HF** is the store of record. Same dataset, `mikkelyo/shopping-list-recipes`,
   `recipes.jsonl`, same `hf_token`. Port it behind `RecipeRepositoryPort` so the deck
   doesn't know where dishes come from. Load once at startup, cache in memory
   (`RecipeLoader`'s trick), `reload()` on demand.
-- **Anthropic** generates fresh dishes when the deck runs dry or when either of us taps
-  "something new" — reuse the template's `AnthropicCompletionAdapter` + forced-tool-use
-  schema behind a `RecipeGeneratorPort`. Model from `settings.json` like the other app.
-- Writing generated recipes back to the dataset: yes, so both apps grow the same pool.
-  Reuse the duplicate-name skip from `RecipeWriter`. Drop the `X-App-Password` gate —
-  it's just us.
-- Secrets: `.secrets.json` locally, `DYNACONF_*` Space secrets on HF. Needs
-  `hf_token` + `llm.api_key`. Both required, fail loudly at startup.
+- **No LLM. No Anthropic. No generation.** recipe-swipe reads the dataset and swipes it;
+  it never authors a dish. `shopping-list-maker` is the app that writes recipes, into the
+  same file, and it already does it well — duplicating that here would mean a second
+  port, adapter, prompt, write path and API key for a button we'd press a few times a
+  year. Ran out of dishes? Generate over there, hit `POST /v1/reload` here.
+- Delete the template's `AnthropicCompletionAdapter`, `anthropic_config` and
+  `completion_config` along with the `example_*` scaffolding. No Anthropic dependency
+  ships in this app.
+- The one thing this app *writes* is `history.jsonl` — an accepted dinner, appended.
+- Secrets: `.secrets.json` locally, `DYNACONF_*` Space secrets on HF. `hf_token` is the
+  only one, and it is required — fail loudly at startup.
 
 ## Shape
 - Ship as Docker on HF Spaces, port 7860 — copy the other app's `Dockerfile` and the
@@ -87,7 +89,9 @@ Under `/v1` per the template's router layout; `/` and `/health` stay at the root
 - `POST /v1/swipe` `{uuid, round_id, liked: [names], position}` → the client's full
   liked set. First call is what joins you. Returns `{matches: [Recipe], roster}`, where
   `matches` is every dish the whole participant set has liked.
-- `POST /v1/generate` → new dish via Anthropic, appended to the dataset and to the deck.
+- `POST /v1/reload` → re-read `recipes.jsonl` from HF, so dishes authored in
+  `shopping-list-maker` appear without a redeploy. Rebuilds the deck; broadcast as a
+  `round_reset`.
 - `GET /v1/events?round_id=&uuid=` — SSE: roster (uuid, emoji, position, deck size),
   match events, round-failed, round_reset. Polling every 2s is the boring fallback if
   SSE on Spaces annoys me.
@@ -172,8 +176,10 @@ and you are the only participant.** Nothing was rejected and nobody is late — 
 just hasn't got a second person yet. Its own copy: *"Through the deck. 6 liked —
 waiting for someone to swipe."*
 
-All three offer the same two buttons — **Generate a new dish** and **Reset**. The sad
-message is the honest answer, and reset is what makes it cheap to be wrong.
+All three offer the same button — **Reset**. The sad message is the honest answer, and
+reset is what makes it cheap to be wrong. If we've truly swiped every dish we own, the
+fix is to go author some in `shopping-list-maker` and reload — not to bolt a generator
+onto this app.
 
 Reaching the end at all is rare now that the deck is the whole dataset. Keep the screen,
 don't design around it.
@@ -373,10 +379,6 @@ mutates a like set. The wire DTO (`SwipeRequestModel`) is the only shape it need
   with `random.Random(seed)`. No sampling, no `deck_size`. The full dataset, every round.
 - Shuffling matters *more* under a full deck, not less: the content is identical every
   round, so order is the only source of variety.
-- `POST /v1/generate` appends the new name to the end of the live deck rather than
-  reshuffling. Everyone's position stays valid, and the new card lands where whoever
-  asked for it is about to reach it. Its justification is now "we've seen these and want
-  something new", not "the deck ran dry".
 - A late joiner is not punished by a long deck: matches fire retroactively, so he only
   has to reach the first card the others both liked — usually early — not our position.
 - `GET /v1/round` ships the whole deck in one payload. A few hundred recipes is a small
@@ -422,24 +424,23 @@ overlay.
   re-posts its like set. That single path covers reconnect, Space wake-up and reset.
 
 ## Config — `settings.json`
-New blocks alongside the template's `anthropic_config`:
+The template's `anthropic_config` and `completion_config` blocks are deleted. What's
+left:
 
 ```json
 "recipe_repository_config": {
   "dataset_repo_id": "mikkelyo/shopping-list-recipes",
   "recipes_path": "recipes.jsonl",
   "history_path": "history.jsonl"
-},
-"generation_config": { "system_prompt": "..." }
+}
 ```
 
-Secrets stay out: `hf_token` and the Anthropic key come from `.secrets.json` locally
-and `DYNACONF_*` Space secrets on HF. Both required at startup — no lazy defaults, no
-"run without HF" degraded mode. If a key is missing I want the Space to fail on boot,
-not at the first swipe.
+Secrets stay out: `hf_token` comes from `.secrets.json` locally and a `DYNACONF_*` Space
+secret on HF. Required at startup — no lazy defaults, no "run without HF" degraded mode.
+If it's missing I want the Space to fail on boot, not at the first swipe.
 
 ## Tests
-Unit only, `pytest`, no live HF or Anthropic calls anywhere.
+Unit only, `pytest`, no live HF calls anywhere.
 
 - `test_swipe_store_adapter.py` — the match rule is the app, so this is the file that
   matters: unanimity with 2/3/5 participants, one no kills a dish, a late joiner fires
@@ -447,11 +448,9 @@ Unit only, `pytest`, no live HF or Anthropic calls anywhere.
   everything, a swipe from an unknown uuid joins them, **a solo participant's Yes fires
   nothing**, and one POST completing several intersections returns them all.
 - `test_deck_service.py` — the deck is every recipe in the dataset, same seed gives the
-  same order, generate appends without disturbing positions.
+  same order, a reload rebuilds it.
 - `test_hf_dataset_recipe_adapter.py` — mocked `huggingface-hub`, duplicate-name skip
   on write, vendor exceptions translated to domain ones at the boundary.
-- `test_recipe_generator_adapter.py` — mocked Anthropic client, forced-tool-use schema
-  parsed into a `Recipe`.
 - `test_di_container.py` — a case per new provider, `assert isinstance(adapter, Port)`.
   Non-negotiable; it's the only guard against wiring drift.
 - Endpoint tests with FastAPI's `TestClient` and the container overridden with fakes:
@@ -470,7 +469,7 @@ Each step ends somewhere I could stop.
 5. `static/index.html` — card, two buttons, localStorage uuid and like set, polling.
    First version that works on a phone.
 6. SSE, replacing polling. Roster strip, live counts, match overlay + share button.
-7. `POST /v1/generate` + write-back to the dataset.
+7. `POST /v1/reload`.
 8. Fail screen, the two death causes, reset behind a confirm.
 9. `history.jsonl` append on accept.
 10. Dockerfile, README front-matter, deploy to the Space, cook something.
@@ -485,7 +484,8 @@ Also explicitly not doing, so I don't relitigate at 22:00 on a build night: mult
 concurrent rounds, a leave button, per-person deck filters, ambition-based filtering,
 a kick/drop affordance, ingredient search, a "who voted no" reveal, and any form of
 expiry, timeout or idle sweep. Also: no deck size, no per-round recipe sampling — the
-deck is the dataset until the deferred lever above says otherwise.
+deck is the dataset until the deferred lever above says otherwise. And **no recipe
+generation** — no LLM in this app at all; authoring lives in `shopping-list-maker`.
 
 ## Ambition is ignored
 The field exists in the dataset but v1 neither shows nor filters on it. I'm the chef —
