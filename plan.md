@@ -341,6 +341,17 @@ Mobile browser is the primary target; desktop is the afterthought. Assume no key
   target, keeps a list of the round's matches.
 - Arrow keys on desktop as a nicety only.
 
+## The winner screen is the shopping list
+The ingredients arrive with the recipe from the dataset, so the shopping list needs no
+second lookup and no derivation — it *is* the `ingredients` array, rendered under the
+dish name.
+
+**It has to outlive the round.** Accept ends the round; if you then pocket the phone and
+reopen it in the shop, the server has no round, you get a fresh one, and the list you
+came to buy is gone. So the accepted dish is written to localStorage and the app opens on
+it — not on card one — until you dismiss it. That's the moment the list is actually
+needed.
+
 ## Match overlay: "Import to notes"
 Lift the share/copy button from `shopping-list-maker`'s `static/index.html` verbatim.
 Same behaviour, same wording:
@@ -351,6 +362,8 @@ Same behaviour, same wording:
   `execCommand("copy")` trick for anything ancient.
 - Button flips to "Copied!" for 1.5s, then back.
 - Payload is the dish name, blank line, then `- ingredient` per line.
+- Same button on the persisted winner screen, not just the live overlay — copying at the
+  shop is the main use, not copying at the moment of the match.
 
 ## Open questions — decided
 Both of these were open. Closing them, because leaving them open is what makes me
@@ -399,6 +412,10 @@ mutates a like set. The wire DTO (`SwipeRequestModel`) is the only shape it need
   has to reach the first card the others both liked — usually early — not our position.
 - `GET /v1/round` ships the whole deck in one payload. A few hundred recipes is a small
   page load; don't build lazy fetching for it.
+
+**Deferred: images on the cards.** Needs an `image` field in `recipes.jsonl` that both
+apps tolerate the absence of. Nothing to build now, but build the card with an image slot
+that collapses when empty, so adding art later is a data change and not a redesign.
 
 **Deferred lever:** pseudorandom sampling instead of the full deck, when the dataset gets
 big enough that rounds stop reaching a match before people get bored. Practical trigger:
