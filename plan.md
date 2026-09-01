@@ -236,28 +236,22 @@ Reset mints a new `round_id`, a new seed and an empty participant set.
 - After a reset nobody is a participant — including whoever pressed it. Everyone
   re-enters the same way they did the first time: by swiping.
 
-### Container restarts vs. Reset
+### Container restarts
 All round state lives in the container. A redeploy or a Space wake-up wipes `round_id`,
 seed, deck, participants, positions, matches and SSE queues. Only the HF dataset is
 durable — a restart costs a round, never a recipe.
 
 In practice this bites *between* rounds, not during one: the Space sleeps on long idle,
-so Tuesday's round is long dead by Saturday. Don't over-engineer for a mid-dinner
-redeploy.
+so Tuesday's round is long dead by Saturday.
 
-The client keeps two sets in localStorage, not one: `liked` **and** `seen` (every name
-voted on, yes or no). Likes are names, so they survive a new deck; without `seen` you
-re-swipe everything you already rejected, which was tolerable at 30 cards and is not at
-150.
+Recovery is the plain 409 re-sync and nothing more. The client's liked set survives
+(likes are names, not positions), it re-enters the fresh round and swipes from card zero.
+It will re-see dishes it already rejected — accepted, not fixed. Storing a client-side
+`seen` set to skip them only pays off during a mid-round redeploy, and buys that with a
+second client set plus a server-side "why is this a new round" flag. Not worth the
+machinery: a match fires early, so you re-swipe until the first match, not the whole deck.
 
-So the round carries an origin, and the client branches on it:
-
-- `origin: "cold_start"` — server had no round. Keep `seen`, silently advance past
-  anything already voted on. The restart is invisible.
-- `origin: "user_reset"` — someone pressed the button. Clear everything client-side and
-  swipe from card zero. Reset stays a real clean slate; that is its whole virtue.
-
-Two consequences, accepted rather than fixed:
+Two consequences, likewise accepted:
 
 - **The seed does not buy restart recovery.** It isn't persisted, so a restarted server
   rolls a new one. Its only jobs are that everyone in a live round shares an order, and
