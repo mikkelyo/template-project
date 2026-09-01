@@ -5,10 +5,32 @@ Python template project using `uv` for dependency management.
 
 ## Stack
 - Python 3.11+
-- Pydantic / pydantic-settings for config and validation
-- dynaconf for settings
+- FastAPI + uvicorn for the HTTP edge
+- Pydantic v2 for validation, DTOs and config models
+- dynaconf for layered settings
 - dependency-injector for DI
+- httpx for outbound HTTP, anthropic for completions
 - pytest for tests
+
+## Architecture
+Ports and adapters. `presentation -> application -> domain`, and
+`infrastructure -> application.ports + domain`.
+
+- `domain/` is pure: stdlib and Pydantic only.
+- `application/` holds use cases and `Protocol` ports; it never imports
+  `infrastructure`, `presentation` or a vendor SDK.
+- `infrastructure/` holds every vendor SDK and all I/O, and converts vendor types and
+  vendor exceptions to domain ones at the boundary.
+- `presentation/` holds FastAPI, DTOs and auth, and reaches use cases through the container.
+- `di_container.py` is the only module allowed to import from every layer.
+
+Adapters satisfy ports structurally — never subclass a port; assert
+`isinstance(adapter, SomePort)` in tests instead. Every new provider needs a case in
+`tests/unit/test_di_container.py`. See README.md for the layer map and the steps for
+adding a port, adapter and use case.
+
+Docstrings are one line. Signatures are typed, so never restate parameters, returns
+or attributes in prose — use a `#` comment where the *reason* is not obvious.
 
 ## Commands
 `uv` is used for all tooling — running scripts, tests, linters, and formatters.

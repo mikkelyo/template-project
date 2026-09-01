@@ -1,1 +1,1 @@
-"""Infrastructure module."""
+"""Infrastructure layer: adapters, clients and every vendor SDK import."""
