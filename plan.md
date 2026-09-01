@@ -296,10 +296,26 @@ participant, so she re-enters by swiping, exactly like everyone else.
 Everyone who joined the round is listed and stays listed until reset — no online dot,
 no greying out, no "last seen". Joining is the only event; reset is the only removal.
 
-- On the phone it's a thin strip along the top, not a sidebar: one emoji chip per
-  participant, in join order. On a wide screen the same list moves to the left rail.
-- Each chip carries that person's progress through the deck — `🦊 12/30`. That's the
-  useful thing to know: whether we're waiting on someone or genuinely out of options.
+It lives at the **bottom**, on one line under the Yes/Nope buttons, with the participant
+count first and Reset on the end:
+
+```
+3 swiping · 🦊 142 · 🐻 4 · 🦉 138          Reset
+```
+
+The count is the thing you scan for, and it sits next to the cure on purpose — the two
+ways a round goes wrong are both read off this line:
+
+- **Count higher than people in the kitchen** → a phantom participant, someone's old tab
+  that swiped once. The raw number is what catches this.
+- **Count right, one person stalled** → she's at 4 and we're at 140. That needs the
+  per-person progress, not the count.
+
+Both diagnoses end in the same tap, which is why Reset is on the same line.
+
+- One emoji chip per participant, in join order, each carrying that person's position in
+  the deck. Emoji is the whole identity and it stays — it's what makes *"waiting on 🦊"*
+  a sentence you can say out loud in a kitchen.
 - You can tell which chip is yours (subtle ring), and that's the extent of identity.
 - Fed by the same SSE stream as matches, so a friend opening the URL just appears.
 - Spectators are not on it. You appear the moment you cast your first swipe, which is
@@ -317,9 +333,9 @@ Mobile browser is the primary target; desktop is the afterthought. Assume no key
   no scrolling needed to reach the buttons.
 - Viewport meta + `touch-action` set so the page never pinch-zooms or rubber-bands
   mid-swipe. Buttons >=48px tall, generous gap so a fat thumb can't hit the wrong one.
-- Participant roster strip along the top edge instead of a bare count — see **The
-  roster** above.
-- **Reset** as a small, deliberately unexciting text button in a corner, behind one
+- Roster line along the bottom edge, under the buttons — see **The roster** above. Top
+  of the screen stays clear for the card.
+- **Reset** sits at the end of that line, small and deliberately unexciting, behind one
   "sure?" confirm. Resets the round for everyone.
 - Match = celebratory overlay with the recipe + ingredients, dismissed by a big tap
   target, keeps a list of the round's matches.
