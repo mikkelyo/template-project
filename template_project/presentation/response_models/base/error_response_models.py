@@ -13,8 +13,8 @@ class ValidationErrorResponse(BaseResponseModel):
     errors: list[str] = Field(..., alias="Errors", description="Validation failures.")
 
 
-class UnauthorizedErrorResponse(BaseResponseModel):
-    """Body of a 401 response."""
+class ErrorResponse(BaseResponseModel):
+    """Body of any response whose failure is a single message, such as 401 or 404."""
 
     error: str = Field(..., alias="Error", description="Why the request was rejected.")
 

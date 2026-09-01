@@ -1,8 +1,12 @@
 """Maps exceptions to the error DTOs the API contract promises."""
 
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+
+# Starlette raises its own HTTPException for unmatched routes; FastAPI's subclasses it,
+# so handling the base class covers both.
+from starlette.exceptions import HTTPException
 
 from template_project.domain.exceptions.api_exception import APIException
 from template_project.domain.exceptions.authentication_exception import (
@@ -11,7 +15,7 @@ from template_project.domain.exceptions.authentication_exception import (
 from template_project.domain.exceptions.validation_exception import ValidationException
 from template_project.presentation.response_models.base.error_response_models import (
     DetailedErrorResponse,
-    UnauthorizedErrorResponse,
+    ErrorResponse,
     ValidationErrorResponse,
 )
 
@@ -28,12 +32,10 @@ async def request_validation_error_handler(
 
 
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
-    """Render a framework-raised HTTP error, such as a rejected token."""
+    """Render any framework-raised HTTP error, keeping the status it carries."""
     return JSONResponse(
         status_code=exc.status_code,
-        content=UnauthorizedErrorResponse(error=str(exc.detail)).model_dump(
-            by_alias=True
-        ),
+        content=ErrorResponse(error=str(exc.detail)).model_dump(by_alias=True),
     )
 
 
@@ -43,7 +45,7 @@ async def authentication_exception_handler(
     """Render an unidentified caller as a 401."""
     return JSONResponse(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        content=UnauthorizedErrorResponse(error=exc.detail).model_dump(by_alias=True),
+        content=ErrorResponse(error=exc.detail).model_dump(by_alias=True),
     )
 
 

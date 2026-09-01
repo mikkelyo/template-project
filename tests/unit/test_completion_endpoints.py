@@ -36,6 +36,15 @@ class TestHealth:
         assert response.status_code == 200
         assert response.text == "OK"
 
+    def test_reports_an_unknown_route_as_a_plain_error(
+        self, client: TestClient
+    ) -> None:
+        """A 404 keeps its status instead of being rendered as an auth failure."""
+        response = client.get("/does-not-exist")
+
+        assert response.status_code == 404
+        assert response.json() == {"Error": "Not Found"}
+
 
 class TestCreateCompletion:
     """Cases for ``POST /v1/completions``."""
