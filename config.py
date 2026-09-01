@@ -8,6 +8,9 @@ re-validated through Pydantic so every layer reads typed config objects.
 from dynaconf import Dynaconf
 from pydantic import BaseModel, Field
 
+from template_project.application.configurations.completion_config import (
+    CompletionConfig,
+)
 from template_project.domain.enums.environment import Environment
 from template_project.infrastructure.configurations.anthropic_config import (
     AnthropicConfig,
@@ -23,6 +26,9 @@ from template_project.infrastructure.configurations.security_config import (
 
 class Settings(BaseModel):
     """Every value the process needs, grouped by the system it configures."""
+
+    # Use cases
+    completion_config: CompletionConfig = CompletionConfig()
 
     # Infrastructure services
     anthropic_config: AnthropicConfig = AnthropicConfig()

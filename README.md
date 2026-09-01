@@ -48,6 +48,7 @@ template_project/
 │   └── conversation/         Message, CompletionResult
 ├── application/              use cases + ports
 │   ├── ports/                typing.Protocol interfaces, one file per port
+│   ├── configurations/       config a use case owns, independent of any vendor
 │   └── completion_service.py use case
 ├── infrastructure/           adapters; every vendor SDK import lives here
 │   ├── configurations/       one Pydantic config model per external system
@@ -100,8 +101,10 @@ singletons that hold it read the ContextVar on every call.
 1. **Port** — `application/ports/<name>_port.py`: `from __future__ import annotations`,
    a `@runtime_checkable class <Name>Port(Protocol)` whose docstring says what the port
    *hides*, and keyword-only methods with `...` bodies.
-2. **Config** — `infrastructure/configurations/<system>_config.py`: a Pydantic model,
-   every field with a default, validation bounds and a `description=`. Add it to
+2. **Config** — a Pydantic model, every field with a default, validation bounds and a
+   `description=`. Put it in `infrastructure/configurations/<system>_config.py` when it
+   configures an external system, or `application/configurations/<use case>_config.py`
+   when the use case owns it and swapping vendors would not change it. Add it to
    `Settings` in `config.py` and give it a block in `settings.json`. Use
    `EnvNameString` for names that must be scoped per environment.
 3. **Adapter** — `infrastructure/<vendor>/<name>_adapter.py`: a plain class with a

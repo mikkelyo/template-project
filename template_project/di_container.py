@@ -95,7 +95,7 @@ class ServiceContainer(containers.DeclarativeContainer):
         completion=infrastructure.completion_adapter,
         current_user=current_user_service,
         metrics=infrastructure.metrics_adapter,
-        system_prompt=settings.anthropic_config.system_prompt,
+        system_prompt=settings.completion_config.system_prompt,
     )
 
 

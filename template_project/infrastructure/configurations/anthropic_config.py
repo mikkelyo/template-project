@@ -13,7 +13,3 @@ class AnthropicConfig(BaseModel):
         60.0, gt=0.0, le=600.0, description="Per-call timeout in seconds."
     )
     max_retries: int = Field(2, ge=0, le=10, description="SDK retries on failure.")
-    system_prompt: str = Field(
-        "You are a helpful assistant.",
-        description="Instructions prepended to every conversation.",
-    )
