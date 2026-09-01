@@ -26,4 +26,3 @@ class DetailedErrorResponse(BaseResponseModel):
     title: str = Field(..., alias="Title", description="Short summary.")
     detail: str = Field(..., alias="Detail", description="What went wrong.")
     error_code: str = Field(..., alias="ErrorCode", description="Error identifier.")
-    severity: str = Field(..., alias="Severity", description="Impact on the caller.")

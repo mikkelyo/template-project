@@ -1,7 +1,6 @@
 """Raised when the caller cannot be identified."""
 
 from template_project.domain.enums.api_error_code import APIErrorCode
-from template_project.domain.enums.api_severity_code import APISeverityCode
 from template_project.domain.exceptions.api_exception import APIException
 
 
@@ -14,5 +13,4 @@ class AuthenticationException(APIException):
             title="Unauthorized",
             detail=detail,
             type="https://httpstatuses.com/401",
-            severity=APISeverityCode.MEDIUM,
         )

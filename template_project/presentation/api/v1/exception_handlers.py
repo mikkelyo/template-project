@@ -69,7 +69,6 @@ async def api_exception_handler(request: Request, exc: APIException) -> JSONResp
             title=exc.title,
             detail=exc.detail,
             error_code=exc.error_code.value,
-            severity=exc.severity.value,
         ).model_dump(by_alias=True),
     )
 
