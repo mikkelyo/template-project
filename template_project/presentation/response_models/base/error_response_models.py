@@ -1,4 +1,4 @@
-"""Outbound DTOs describing failures."""
+"""The single outbound DTO describing a failure, shaped after RFC 7807."""
 
 from pydantic import Field
 
@@ -7,22 +7,14 @@ from template_project.presentation.response_models.base.base_response_model impo
 )
 
 
-class ValidationErrorResponse(BaseResponseModel):
-    """Body of a 400 response."""
-
-    errors: list[str] = Field(..., alias="Errors", description="Validation failures.")
-
-
 class ErrorResponse(BaseResponseModel):
-    """Body of any response whose failure is a single message, such as 401 or 404."""
-
-    error: str = Field(..., alias="Error", description="Why the request was rejected.")
-
-
-class DetailedErrorResponse(BaseResponseModel):
-    """Body of a 500 response, mirroring :class:`APIException`."""
+    """Body of every error response, whatever the status."""
 
     type: str = Field(..., alias="Type", description="URI describing the status.")
     title: str = Field(..., alias="Title", description="Short summary.")
+    status: int = Field(..., alias="Status", description="HTTP status code.")
     detail: str = Field(..., alias="Detail", description="What went wrong.")
     error_code: str = Field(..., alias="ErrorCode", description="Error identifier.")
+    errors: list[str] | None = Field(
+        None, alias="Errors", description="Individual failures, when there are several."
+    )

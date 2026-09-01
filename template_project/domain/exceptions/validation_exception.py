@@ -12,10 +12,7 @@ class ValidationException(APIException):
         detail: str = "The request payload is invalid.",
         field: str | None = None,
     ) -> None:
-        self.field = field
         super().__init__(
             error_code=APIErrorCode.VALIDATION_ERROR,
-            title="Bad Request",
-            detail=detail,
-            type="https://httpstatuses.com/400",
+            detail=f"{field}: {detail}" if field else detail,
         )

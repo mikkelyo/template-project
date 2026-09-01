@@ -43,7 +43,13 @@ class TestHealth:
         response = client.get("/does-not-exist")
 
         assert response.status_code == 404
-        assert response.json() == {"Error": "Not Found"}
+        assert response.json() == {
+            "Type": "https://httpstatuses.com/404",
+            "Title": "Not Found",
+            "Status": 404,
+            "Detail": "Not Found",
+            "ErrorCode": "api/error",
+        }
 
 
 class TestCreateCompletion:
@@ -61,7 +67,7 @@ class TestCreateCompletion:
         response = client.post("/v1/completions", json=VALID_BODY)
 
         assert response.status_code == 401
-        assert "Error" in response.json()
+        assert response.json()["ErrorCode"] == "api/authentication-error"
 
     def test_rejects_an_invalid_payload(self, client: TestClient) -> None:
         """Payload failures are rendered through the shared error DTO."""

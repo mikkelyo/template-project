@@ -1,6 +1,6 @@
 """Authentication dependencies and the composed dependency list routes apply."""
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from config import settings
@@ -20,10 +20,7 @@ async def require_api_key(
 ) -> None:
     """Reject requests that do not carry the configured bearer token."""
     if credentials is None or credentials.credentials != settings.service_api_key:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=StaticMessages.INVALID_API_KEY,
-        )
+        raise AuthenticationException(detail=StaticMessages.INVALID_API_KEY)
 
 
 async def set_current_user_from_body(request: Request) -> None:
