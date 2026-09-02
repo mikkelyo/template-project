@@ -14,9 +14,18 @@ Scoped to a *round*, not a calendar day: it starts when one of us opens the app 
 ends when we accept a dish.
 
 Recipes come from the same HF dataset as the shopping list maker
-(`mikkelyo/shopping-list-recipes`, `recipes.jsonl`) — one source of truth, both apps
-read *and* write it. Recipe model is already `{name, ambition, ingredients}`, enough to
-render a card.
+(`mikkelyo/shopping-list-recipes`, `recipes.jsonl`) — one source of truth. That app
+writes it; this one only reads it. Schema confirmed against the live file:
+
+```json
+{"name": "Green curry", "ambition": "low",
+ "ingredients": ["red onion", "garlic", "2x coconut milk", "frozen asian veggies", "broth", "rice"]}
+```
+
+`ambition` is `low | medium | high`. Ingredients are already written shopping-list style
+— `"2x coconut milk"`, `"3x mutti tomatoes"` — so they need no processing to become the
+list you shop from. **25 recipes as of today**, and that number matters — see **Running
+out is real**.
 
 ## Base: clone `template-project`, not `shopping-list-maker`
 Start from `/c/Users/mikke/GitHub/template-project` — the ports-and-adapters one — and
@@ -63,16 +72,15 @@ provider gets a case in `tests/unit/test_di_container.py` — same rules as the 
 - Delete the template's `AnthropicCompletionAdapter`, `anthropic_config` and
   `completion_config` along with the `example_*` scaffolding. No Anthropic dependency
   ships in this app.
-- The one thing this app *writes* is `history.jsonl` — an accepted dinner, appended.
 - Secrets: `.secrets.json` locally, `DYNACONF_*` Space secrets on HF. `hf_token` is the
   only one, and it is required — fail loudly at startup.
 
 ## Shape
 - Ship as Docker on HF Spaces, port 7860 — copy the other app's `Dockerfile` and the
   YAML front-matter block in `README.md`. Template's `app.py` binds 8080 locally.
-- **The HF dataset is the only durable store.** Recipes and `history.jsonl` live there;
-  everything else is container-local and disposable by design. A redeploy costs a round,
-  never a recipe.
+- **The HF dataset is the only durable store, and this app only reads it.** Recipes live
+  there; everything else is container-local and disposable by design. A redeploy costs a
+  round, never a recipe.
 - All swipe state in a single in-memory singleton behind `SwipeStorePort`. No DB.
   `{round_id: {recipe_name: set[uuid]}}` plus the round's participant set. No timestamps.
 - Strip the template's bearer-token auth off these routes (`SERVICE_API_KEY`,
@@ -84,14 +92,17 @@ Under `/v1` per the template's router layout; `/` and `/health` stay at the root
 
 - `GET /` — the swipe UI (`static/index.html`).
 - `GET /health`
-- `GET /v1/round` → `{round_id, deck, roster}` — the open round, created on the fly if
-  there isn't one. Read-only: calling it makes you a spectator, not a participant.
+- `GET /v1/round` → `{round_id, deck, roster, winner}` — the open round, created on the
+  fly if there isn't one. Read-only: calling it makes you a spectator, not a participant.
+  Creation is **first-write-wins under the store's lock**: you and she both opening the
+  app at 17:00 must not mint two rounds, or nothing can ever match.
 - `POST /v1/swipe` `{uuid, round_id, liked: [names], position}` → the client's full
   liked set. First call is what joins you. Returns `{matches: [Recipe], roster}`, where
   `matches` is every dish the whole participant set has liked.
 - `POST /v1/reload` → re-read `recipes.jsonl` from HF, so dishes authored in
-  `shopping-list-maker` appear without a redeploy. Rebuilds the deck; broadcast as a
-  `round_reset`.
+  `shopping-list-maker` appear without a redeploy. It changes the deck, so it *is* a
+  reset: new round, new seed, empty roster, broadcast as `round_reset`. Anything gentler
+  would leave people holding positions into a deck that no longer matches them.
 - `GET /v1/events?round_id=&uuid=` — SSE: roster (uuid, emoji, position, deck size),
   match events, round-failed, round_reset. Polling every 2s is the boring fallback if
   SSE on Spaces annoys me.
@@ -133,8 +144,8 @@ participant is in the round until someone hits reset. That is the whole lifecycl
    no deck size: every recipe is in every round, shuffled with the round's seed, same
    order for everyone. Each uuid stores only its position. Overlap by construction, so
    matches come fast, and someone joining late lands on the same cards we already voted
-   on. The deck length is a *ceiling*, not an expectation — a match fires long before
-   anyone reaches the end.
+   on. With 25 recipes in the dataset today, reaching the end of the deck is a normal
+   evening rather than an edge case — see **Running out is real**.
 5. **Unanimity, no quorum.** A match is a dish that **every** participant in the round
    has swiped yes on. Not a majority, not "most", not a threshold — all of them. One no
    means that dish is out for this round.
@@ -184,6 +195,25 @@ onto this app.
 Reaching the end at all is rare now that the deck is the whole dataset. Keep the screen,
 don't design around it.
 
+## Running out is real
+I earlier assumed the deck was long enough that a match always fires first. At 25 recipes
+that is not true, and the arithmetic is worth writing down. If each person says yes to
+roughly a third of the deck:
+
+| Swiping | Expected unanimous dishes in 25 |
+|---|---|
+| 2 people | ~2.8 |
+| 3 people | ~0.9 |
+| 4 people | ~0.3 |
+
+The two of us usually match. Three of us scrape by. A dinner party mostly fails. That is
+not a flaw in unanimity — it's a small dataset, and the fix is more recipes, not a weaker
+rule. **The recourse is to go author dishes in `shopping-list-maker` and hit
+`POST /v1/reload`.** Every recipe added there makes every future round here more likely
+to land.
+
+So: don't add a quorum the first time a dinner party fails. Add recipes.
+
 ## Joining — the whole lifecycle
 Under unanimity, *when* someone becomes a participant is the highest-stakes decision in
 the app: every participant is a veto. So the rule has to be dull and predictable.
@@ -204,8 +234,10 @@ This one rule kills most of the failure modes for free:
 ### Identity
 - `uuid` minted into localStorage on first load, reused forever. Not an account, not
   tied to a person — it's a browser.
-- Emoji is derived from the uuid (hash into a fixed palette), with a collision bump
-  against the current roster so two people are never both 🦊.
+- Emoji is derived from the uuid — hash into a fixed palette of **animals** (🦊 🐻 🦉 🐢
+  🦆 🐙 🦡 🐝 🦭 🐐 …), with a collision bump against the current roster so two people are
+  never both 🦊. Animals because they're instantly distinguishable at chip size and nobody
+  reads anything into being the badger.
 - The server stores nothing about you but `uuid -> {emoji, position}`. There is no
   profile to leak because there is no profile.
 
@@ -226,6 +258,11 @@ participant set would mean a dish could un-win while you're reading the ingredie
 
 Someone who joins after a match has fired gets the overlay too, mid-deck — Accept ends
 the round for everyone, and a late joiner must not be left staring at a dead screen.
+
+Someone who opens the app *after* Accept sees the winner, not a fresh deck: the accepted
+dish rides on the round and comes back from `GET /v1/round`, so a phone that was never in
+the round still shows tonight's dinner and its shopping list. Reset clears it, for
+everyone, and starts the next round.
 
 ### Reset is a new round, and everyone finds out
 Reset is available to **anyone with the URL**, spectators included — the person who spots
@@ -383,12 +420,13 @@ opens later, a visible `1/2` marks exactly which cards I pre-liked, and she stop
 and starts shopping my shortlist. A count on a card someone hasn't reached is
 information about them, not about the dish.
 
-**Log what we ate?** Yes, but as the smallest possible thing: `POST /v1/round/end`
-appends one line to `history.jsonl` in the same HF dataset —
-`{date, recipe_name, participants: [emoji]}`. No UI in v1, no read path, no endpoint to
-query it. It's a file that accumulates so that a "what did we eat in March" screen is
-possible later; building the screen now is scope I don't need. If the append fails,
-log it and still end the round — dinner does not wait on a dataset write.
+**Log what we ate?** No. It was going to be a `history.jsonl` append on Accept — no UI,
+no read path, no endpoint — accumulating against a "what did we eat in March" screen that
+doesn't exist and may never. That's building for a hypothetical.
+
+Dropping it has a second effect worth having: **this app writes nothing at all.** It is a
+pure reader of the dataset. No write path, no duplicate handling, no partial-write
+failure mode, and `hf_token` only ever needs read scope.
 
 ## Domain model
 Four Pydantic models, `domain/` only, no I/O:
@@ -457,6 +495,9 @@ overlay.
   outcome, so it doesn't break "no clocks anywhere".
 - On disconnect the queue is dropped. Nothing about the round changes — a closed stream
   is not a leave.
+- Phones kill streams on screen lock, so expect this constantly rather than rarely.
+  Reconnect on `visibilitychange` as well as on error, with backoff. If it's still flaky
+  in the kitchen, the 2s polling fallback is the escape and costs nothing to switch to.
 - The client reconnects with backoff and, on connect, re-fetches `GET /v1/round` and
   re-posts its like set. That single path covers reconnect, Space wake-up and reset.
 
@@ -467,8 +508,7 @@ left:
 ```json
 "recipe_repository_config": {
   "dataset_repo_id": "mikkelyo/shopping-list-recipes",
-  "recipes_path": "recipes.jsonl",
-  "history_path": "history.jsonl"
+  "recipes_path": "recipes.jsonl"
 }
 ```
 
@@ -507,9 +547,8 @@ Each step ends somewhere I could stop.
    First version that works on a phone.
 6. SSE, replacing polling. Roster strip, live counts, match overlay + share button.
 7. `POST /v1/reload`.
-8. Fail screen, the two death causes, reset behind a confirm.
-9. `history.jsonl` append on accept.
-10. Dockerfile, README front-matter, deploy to the Space, cook something.
+8. Fail screen, the three end states, reset behind a confirm.
+9. Dockerfile, README front-matter, deploy to the Space, cook something.
 
 ## Not doing
 Users, accounts, auth, room codes, a database, persisting swipe history past the round.
