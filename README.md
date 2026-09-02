@@ -26,9 +26,12 @@ values belong in the committed `settings.json`. Interactive docs are at `/apidoc
 ## Starting a new project from this template
 
 ```bash
-uv run python scripts/rename_project.py my_app   # rewrites the name, moves the package
-uv lock && uv run pytest
+uv run python scripts/rename_project.py my_app   # moves the package, rewrites the name, relocks
+uv run pytest
 ```
+
+It needs a clean tree, and prints the steps it deliberately leaves to you. Review it
+with `git diff HEAD`; `git reset --hard` undoes the whole thing.
 
 Then delete the `example_client` / `example_api_config` scaffolding: it exists only to
 demonstrate the `RestClient` + factory-function pattern, and it is referenced from
