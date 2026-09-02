@@ -76,6 +76,10 @@ provider gets a case in `tests/unit/test_di_container.py` — same rules as the 
   only one, and it is required — fail loudly at startup.
 
 ## Shape
+- **One process, always.** The lock, the store and the SSE queues are all in-memory, so
+  a second uvicorn worker means two people can land on different workers, get different
+  rounds and never match — with the lock protecting nothing. No `--workers`, no gunicorn.
+  Irrelevant at three users, and exactly the kind of thing added later by reflex.
 - Ship as Docker on HF Spaces, port 7860 — copy the other app's `Dockerfile` and the
   YAML front-matter block in `README.md`. Template's `app.py` binds 8080 locally.
 - **The HF dataset is the only durable store, and this app only reads it.** Recipes live
@@ -484,6 +488,54 @@ Otherwise `set.intersection(*likes.values()) - {m.recipe.name for m in matches}`
 anything left is new, gets appended to `matches` and broadcast. It can be more than one
 dish when a client posts buffered swipes, so the result is a list all the way to the
 overlay.
+
+## Situations, and what each one does
+The whole app is one mutable object behind one lock, so "handled gracefully" means every
+one of these has a named, boring outcome. This table is the checklist the code is written
+against, and the unit tests mirror it row for row.
+
+**Concurrency — all of it inside the store's `asyncio.Lock`.** The critical section is
+read-modify-write, never a check outside the lock followed by a write inside it.
+
+| Situation | What happens |
+|---|---|
+| Two people open at once, no round exists | `if self.round is None` sits *inside* the lock. One creates, the other gets the same round back. Same `round_id`, same deck. |
+| Two swipes land together | Recording likes, intersecting, deduping against `matches` and appending are one critical section. The second swipe sees the first's match already recorded and can't double-fire it. |
+| Someone joins while a swipe is computing | Same lock, so an intersection is always over a consistent participant set. |
+| A swipe races a reset | Old `round_id` → `409` with the current round → client re-syncs and re-posts its whole liked set. |
+| Two tabs, one browser | Same uuid from localStorage, so one participant. Positions last-write-wins; harmless. |
+
+**Round lifecycle**
+
+| Situation | What happens |
+|---|---|
+| Solo participant swipes Yes | Nothing fires. A round of one cannot conclude. |
+| Second person swipes Yes on a dish the first liked | Match fires for both, retroactively, however long ago the first vote was. |
+| Late joiner arrives mid-round | Spectator until their first swipe, then starts at card 0 on the same deck. |
+| A match already fired before they joined | Not retracted. They get the overlay too. |
+| Someone opens the app after Accept | Winner screen with the shopping list, from `GET /v1/round`. Not a fresh deck. |
+| Reset pressed | New `round_id`, new seed, empty roster, `round_reset` broadcast. Nobody is a participant, including whoever pressed it. |
+| Reload pressed | Identical to reset, plus a re-read of `recipes.jsonl`. |
+| Container restarts mid-round | Client's stale `round_id` → `409` → re-sync into the new round and re-post likes. Likes are names, so they survive. |
+
+**End of deck — three distinct screens, never one vague one**
+
+| Situation | What happens |
+|---|---|
+| Everyone finished, nothing unanimous | *"No dinner. 😔 25 dishes, nothing all 3 of you wanted."* |
+| Everyone else finished, one person behind | *"Waiting on 🦊 (4/25)"* — a label, not a control. |
+| Through the deck, only participant | *"Through the deck. 6 liked — waiting for someone to swipe."* |
+
+**Degenerate inputs**
+
+| Situation | What happens |
+|---|---|
+| HF unreachable or `hf_token` missing at startup | Fail on boot, loudly. No degraded mode, no empty deck. |
+| Dataset empty | Same — a zero-card round is not a state worth supporting. |
+| Emoji collision on the roster | Bump to the next free animal in the palette. |
+| Match fires mid-drag | Overlay takes it; **Keep swiping** returns to the exact card and position. |
+| Client posts buffered offline swipes | Can complete several intersections at once — the response and the overlay both take a list. |
+| SSE dropped on screen lock | Reconnect on `visibilitychange` and on error, with backoff; re-fetch the round on connect. |
 
 ## SSE
 - `asyncio.Queue` per connected client, held in the same singleton. Broadcast = put the
